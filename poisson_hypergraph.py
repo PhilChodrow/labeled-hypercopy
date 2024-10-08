@@ -27,7 +27,9 @@ class GH:
         else: 
             return([value1, value0])
         
-    def likelihood(self, e_index, u_index, e_prime_index, lambda_ = 1, u_prob = 1):
+    def likelihood(self, e_index, u_index, e_prime_index, theta):
+        p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
+
         node_labels = self.get_labels()
 
         e = self.edge_members[e_index]
@@ -74,10 +76,10 @@ class GH:
 
         prob_u = 1 / len(e)
 
-        P1 = self.p ** (int_num_u - 1)
-        P2 = (1 - self.p) ** (e_num_u - int_num_u)
-        P3 = self.q ** (int_num_r)
-        P4 = (1 - self.q) ** (e_num_r - int_num_r)
+        P1 = p ** (int_num_u - 1)
+        P2 = (1 - p) ** (e_num_u - int_num_u)
+        P3 = q ** (int_num_r)
+        P4 = (1 - q) ** (e_num_r - int_num_r)
 
         if ext_num_u == 0:
             prob_those_ext_u = 1
@@ -87,10 +89,10 @@ class GH:
             prob_those_ext_r = 1
         else: prob_those_ext_r = ext_num_r / all_ext_num_r
 
-        P5_numer = (math.e ** (-lambda_ * u_prob)) * ((lambda_ * u_prob) ** ext_num_u) * prob_those_ext_u * (math.e ** (-lambda_ * (1 - u_prob))) * ((lambda_ * (1 - u_prob)) ** ext_num_r) * prob_those_ext_r
+        P5_numer = (math.e ** (-gamma_eu)) * (gamma_eu ** ext_num_u) * prob_those_ext_u * (math.e ** (-gamma_er)) * (gamma_er ** ext_num_r) * prob_those_ext_r
         P5_denom = math.factorial(ext_num_u) * math.factorial(ext_num_r)
         P5 = P5_numer / P5_denom
-        P6_numer = (math.e ** (-lambda_ * u_prob)) * ((lambda_ * u_prob) ** novel_num_u) * (math.e ** (-lambda_ * (1 - u_prob))) * ((lambda_ * (1 - u_prob)) ** novel_num_r)
+        P6_numer = (math.e ** (-gamma_nu)) * (gamma_nu ** novel_num_u) * (math.e ** (-gamma_nr)) * (gamma_nr ** novel_num_r)
         P6_denom = (math.factorial(novel_num_u) * math.factorial(novel_num_r))
         P6 = P6_numer / P6_denom
         prob_e_prime = P1 * P2 * P3 * P4 * P5 * P6
@@ -99,7 +101,7 @@ class GH:
 
         return(prob)
 
-    def add_hyperedge(self, num_edges = 1, lambda_ = 1, u_prob = 1):
+    def add_hyperedge(self, num_edges = 1, gamma_nu = 1, gamma_nr = 1, gamma_eu = 1, gamma_er = 1):
         for i in range(num_edges):
             e_prime = [] # create an empty new edge called e_prime
 
@@ -132,44 +134,40 @@ class GH:
                     e_prime.append(node)
             
             ## add exterior nodes
-            num_ext = np.random.poisson(lambda_, 1)[0]
-
+            num_ext_u = np.random.poisson(gamma_eu, 1)[0]
+            num_ext_r = np.random.poisson(gamma_er, 1)[0]
 
             u_indices = list(filter(lambda x: self.node_labels[x] == u_label, self.nodes))
             r_indices = list(filter(lambda x: self.node_labels[x] != u_label, self.nodes))
 
+            for i in range(0, num_ext_u):
+                if len(set(u_indices) - set(e)) > 0:
+                    exterior_node = random.sample(list(set(u_indices) - set(e)), 1)[0] # randomly sample a node from outside the existing hyperedge
+                    e_prime.append(exterior_node)
 
-            for i in range(0, num_ext):
-                is_u = np.random.choice([0, 1], p = [1 - u_prob, u_prob])
-                if is_u == 0:
-                    if len(set(r_indices) - set(e)) > 0:
-                        exterior_node = random.sample(list(set(r_indices) - set(e)), 1)[0] # randomly sample a node from outside the existing hyperedge
-                        e_prime.append(exterior_node)
-                if is_u == 1:
-                    if len(set(u_indices) - set(e)) > 0:
-                        exterior_node = random.sample(list(set(u_indices) - set(e)), 1)[0] # randomly sample a node from outside the existing hyperedge
-                        e_prime.append(exterior_node)
+            for i in range(0, num_ext_r):
+                if len(set(r_indices) - set(e)) > 0:
+                    exterior_node = random.sample(list(set(r_indices) - set(e)), 1)[0] # randomly sample a node from outside the existing hyperedge
+                    e_prime.append(exterior_node)
 
             ## Add new nodes        
-            num_new = np.random.poisson(lambda_, 1)[0]
+            num_new_u = np.random.poisson(gamma_nu, 1)[0]
+            num_new_r = np.random.poisson(gamma_nr, 1)[0]
 
-            for i in range(0, num_new):
+            for i in range(0, num_new_u):
                 new_node = len(self.nodes)
-                # self.H.add_node(new_node)
                 self.nodes.append(new_node)
-                is_u = np.random.choice([0, 1], p = [1 - u_prob, u_prob])
-                if is_u == 1:
-                    # self.H.set_node_attributes({new_node : u_label}, name = "label")
-                    self.node_labels.append(u_label)
-                if is_u == 0:
-                    # self.H.set_node_attributes({new_node : r_label}, name = "label")
-                    self.node_labels.append(r_label)
-                e_prime.append(new_node)
+                self.node_labels.append(u_label)
+
+            for i in range(0, num_new_r):
+                new_node = len(self.nodes)
+                self.nodes.append(new_node)
+                self.node_labels.append(r_label)
 
             ## Add the edge to the hypergraph
             # self.H.add_edge(e_prime)
             self.edge_members.append(set(e_prime))
-        
+
         # big_H = xgi.Hypergraph(self.edge_members)
         # node_dict = dict(zip(self.nodes, self.node_labels))
         # big_H.set_node_attributes(node_dict, name = "label")
