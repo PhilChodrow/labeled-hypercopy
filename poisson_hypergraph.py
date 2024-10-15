@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import random
 import pandas as pd
 import math
+import scipy.special as ss; ss.binom
 
 class GH:
     def __init__(self, H, labels, p, q):
@@ -84,10 +85,10 @@ class GH:
         if ext_num_u == 0:
             prob_those_ext_u = 1
         else:
-            prob_those_ext_u = ext_num_u / all_ext_num_u
+            prob_those_ext_u = 1 / ss.binom(all_ext_num_u, ext_num_u) # formerly: ext_num_u / all_ext_num_u
         if ext_num_r == 0:
             prob_those_ext_r = 1
-        else: prob_those_ext_r = ext_num_r / all_ext_num_r
+        else: prob_those_ext_r = 1 / ss.binom(all_ext_num_r, ext_num_r) # formerly: ext_num_r / all_ext_num_r
 
         P5_numer = (math.e ** (-gamma_eu)) * (gamma_eu ** ext_num_u) * prob_those_ext_u * (math.e ** (-gamma_er)) * (gamma_er ** ext_num_r) * prob_those_ext_r
         P5_denom = math.factorial(ext_num_u) * math.factorial(ext_num_r)
@@ -158,11 +159,13 @@ class GH:
                 new_node = len(self.nodes)
                 self.nodes.append(new_node)
                 self.node_labels.append(u_label)
+                e_prime.append(new_node)
 
             for i in range(0, num_new_r):
                 new_node = len(self.nodes)
                 self.nodes.append(new_node)
                 self.node_labels.append(r_label)
+                e_prime.append(new_node)
 
             ## Add the edge to the hypergraph
             # self.H.add_edge(e_prime)
