@@ -15,6 +15,9 @@ class GH:
         self.edge_members = H.edges.members()
         self.node_labels = H.nodes.attrs("label").aslist()
         self.nodes = list(H.nodes)
+        self.last_added = [max(H.nodes)] * len(H.edges)
+        self.total_num_1 = sum(self.node_labels)
+        self.total_num_0 = len(self.node_labels) - self.total_num_1
 
     def get_labels(self):
         return(self.node_labels)
@@ -28,10 +31,10 @@ class GH:
         else: 
             return([value1, value0])
         
-    def likelihood(self, e_index, u_index, e_prime_index, theta):
+    def return_key_values(self, e_index, u_index, e_prime_index, theta):
         p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
 
-        node_labels = self.get_labels()
+        node_labels = self.node_labels
 
         e = self.edge_members[e_index]
         e_prime = self.edge_members[e_prime_index]
@@ -46,31 +49,41 @@ class GH:
 
         node_labels = self.get_labels()
         e_labels = [node_labels[node] for node in e]
+        e_prime_labels = [node_labels[node] for node in e_prime]
         int_labels = [node_labels[node] for node in intersect]
 
         # Get edge and intersection sizes
-        e_num_u, e_num_r = self.set_values(len(e_labels) - sum(e_labels), sum(e_labels), u_label)
+        e_prime_num_1 = sum(e_prime_labels)
+        e_prime_num_0 = len(e_prime_labels) - e_prime_num_1
+        e_num_1 = sum(e_labels)
+        e_num_0 = len(e_labels) - e_num_1
+        e_num_u, e_num_r = self.set_values(e_num_0, e_num_1, u_label)
+        e_prime_num_u, e_prime_num_r = self.set_values(e_prime_num_0, e_prime_num_1, u_label)
         int_num_u, int_num_r = self.set_values(len(int_labels) - sum(int_labels), sum(int_labels), u_label)
 
-        # Get the external nodes
-        prev_edges = self.edge_members[0:e_prime_index]
-        prev_nodes = list(range(max(prev_edges[-1]) + 1))
-
-        all_external_nodes = set(prev_nodes) - set(e)
-        all_external_labels = [node_labels[node] for node in all_external_nodes]
-
-        external_nodes = set([node for node in prev_nodes if node in e_prime]) - set(e)
-        external_labels = [node_labels[node] for node in external_nodes]
-
-        all_ext_num_u, all_ext_num_r = self.set_values(len(all_external_labels) - sum(all_external_labels), sum(all_external_labels), u_label)
-
-        ext_num_u, ext_num_r = self.set_values(len(external_labels) - sum(external_labels), sum(external_labels), u_label)
-
         # Get the new nodes
+        prev_edges = self.edge_members[0:e_prime_index]
+        prev_nodes = list(range(self.last_added[e_prime_index - 1] + 1))
+
         novel_nodes = set(e_prime) - set(prev_nodes)
         novel_labels = [node_labels[node] for node in novel_nodes]
 
         novel_num_u, novel_num_r = self.set_values(len(novel_labels) - sum(novel_labels), sum(novel_labels), u_label)
+      
+        # Get the external nodes
+        # total_num_1 = sum(node_labels)
+        # total_num_0 = len(node_labels) - total_num_1
+        all_ext_num_0 = self.total_num_0 - e_num_0
+        all_ext_num_1 = self.total_num_1 - e_num_1
+
+        # external_nodes = set(prev_nodes).intersection(e_prime) - set(e)
+        # external_labels = [node_labels[node] for node in external_nodes]           
+        ext_num_u = e_prime_num_u - int_num_u - novel_num_u
+        ext_num_r = e_prime_num_r - int_num_r - novel_num_r
+
+
+        all_ext_num_u, all_ext_num_r = self.set_values(all_ext_num_0, all_ext_num_1, u_label)
+        # ext_num_u, ext_num_r = self.set_values(len(external_labels) - sum(external_labels), sum(external_labels), u_label)
 
         # Probability calculation
         prob_e = 1 / e_prime_index
@@ -96,7 +109,91 @@ class GH:
         P6_numer = (math.e ** (-gamma_nu)) * (gamma_nu ** novel_num_u) * (math.e ** (-gamma_nr)) * (gamma_nr ** novel_num_r)
         P6_denom = (math.factorial(novel_num_u) * math.factorial(novel_num_r))
         P6 = P6_numer / P6_denom
-        prob_e_prime = P1 * P2 * P3 * P4 * P5 * P6
+        prob_e_prime = P1 * P2 * P3 * P4  * P5 * P6
+        
+        prob = prob_e * prob_u * prob_e_prime
+
+        return(prob)        
+        
+    def likelihood(self, e_index, u_index, e_prime_index, theta):
+        p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
+
+        node_labels = self.node_labels
+
+        e = self.edge_members[e_index]
+        e_prime = self.edge_members[e_prime_index]
+        u_label = node_labels[u_index]
+
+        intersect = e.intersection(e_prime)
+
+        if len(intersect) == 0:
+            return(0)
+        if u_index not in e_prime:
+            return(0)
+
+        node_labels = self.get_labels()
+        e_labels = [node_labels[node] for node in e]
+        e_prime_labels = [node_labels[node] for node in e_prime]
+        int_labels = [node_labels[node] for node in intersect]
+
+        # Get edge and intersection sizes
+        e_prime_num_1 = sum(e_prime_labels)
+        e_prime_num_0 = len(e_prime_labels) - e_prime_num_1
+        e_num_1 = sum(e_labels)
+        e_num_0 = len(e_labels) - e_num_1
+        e_num_u, e_num_r = self.set_values(e_num_0, e_num_1, u_label)
+        e_prime_num_u, e_prime_num_r = self.set_values(e_prime_num_0, e_prime_num_1, u_label)
+        int_num_u, int_num_r = self.set_values(len(int_labels) - sum(int_labels), sum(int_labels), u_label)
+
+        # Get the new nodes
+        prev_edges = self.edge_members[0:e_prime_index]
+        prev_nodes = list(range(self.last_added[e_prime_index - 1] + 1))
+
+        novel_nodes = set(e_prime) - set(prev_nodes)
+        novel_labels = [node_labels[node] for node in novel_nodes]
+
+        novel_num_u, novel_num_r = self.set_values(len(novel_labels) - sum(novel_labels), sum(novel_labels), u_label)
+      
+        # Get the external nodes
+        # total_num_1 = sum(node_labels)
+        # total_num_0 = len(node_labels) - total_num_1
+        all_ext_num_0 = self.total_num_0 - e_num_0
+        all_ext_num_1 = self.total_num_1 - e_num_1
+
+        # external_nodes = set(prev_nodes).intersection(e_prime) - set(e)
+        # external_labels = [node_labels[node] for node in external_nodes]           
+        ext_num_u = e_prime_num_u - int_num_u - novel_num_u
+        ext_num_r = e_prime_num_r - int_num_r - novel_num_r
+
+
+        all_ext_num_u, all_ext_num_r = self.set_values(all_ext_num_0, all_ext_num_1, u_label)
+        # ext_num_u, ext_num_r = self.set_values(len(external_labels) - sum(external_labels), sum(external_labels), u_label)
+
+        # Probability calculation
+        prob_e = 1 / e_prime_index
+
+        prob_u = 1 / len(e)
+
+        P1 = p ** (int_num_u - 1)
+        P2 = (1 - p) ** (e_num_u - int_num_u)
+        P3 = q ** (int_num_r)
+        P4 = (1 - q) ** (e_num_r - int_num_r)
+
+        if ext_num_u == 0:
+            prob_those_ext_u = 1
+        else:
+            prob_those_ext_u = 1 / ss.binom(all_ext_num_u, ext_num_u) # formerly: ext_num_u / all_ext_num_u
+        if ext_num_r == 0:
+            prob_those_ext_r = 1
+        else: prob_those_ext_r = 1 / ss.binom(all_ext_num_r, ext_num_r) # formerly: ext_num_r / all_ext_num_r
+
+        P5_numer = (math.e ** (-gamma_eu)) * (gamma_eu ** ext_num_u) * prob_those_ext_u * (math.e ** (-gamma_er)) * (gamma_er ** ext_num_r) * prob_those_ext_r
+        P5_denom = math.factorial(ext_num_u) * math.factorial(ext_num_r)
+        P5 = P5_numer / P5_denom
+        P6_numer = (math.e ** (-gamma_nu)) * (gamma_nu ** novel_num_u) * (math.e ** (-gamma_nr)) * (gamma_nr ** novel_num_r)
+        P6_denom = (math.factorial(novel_num_u) * math.factorial(novel_num_r))
+        P6 = P6_numer / P6_denom
+        prob_e_prime = P1 * P2 * P3 * P4  * P5 * P6
         
         prob = prob_e * prob_u * prob_e_prime
 
@@ -155,21 +252,33 @@ class GH:
             num_new_u = np.random.poisson(gamma_nu, 1)[0]
             num_new_r = np.random.poisson(gamma_nr, 1)[0]
 
+            last = self.last_added[-1]
             for i in range(0, num_new_u):
                 new_node = len(self.nodes)
                 self.nodes.append(new_node)
                 self.node_labels.append(u_label)
                 e_prime.append(new_node)
+                last = new_node
+                if u_label == 0:
+                    self.total_num_0 += 1
+                else:
+                    self.total_num_1 += 1
 
             for i in range(0, num_new_r):
                 new_node = len(self.nodes)
                 self.nodes.append(new_node)
                 self.node_labels.append(r_label)
                 e_prime.append(new_node)
+                last = new_node
+                if u_label == 1:
+                    self.total_num_0 += 1
+                else:
+                    self.total_num_1 += 1
 
             ## Add the edge to the hypergraph
             # self.H.add_edge(e_prime)
             self.edge_members.append(set(e_prime))
+            self.last_added.append(last)
 
         # big_H = xgi.Hypergraph(self.edge_members)
         # node_dict = dict(zip(self.nodes, self.node_labels))
