@@ -465,8 +465,6 @@ class GH:
             prob_addition += Sef1*math.log(p/(1-p)) + f1*math.log(1-p) - math.log(p)
             prob_addition += Sef0*math.log(q/(1-q)) + f0*math.log(1-q)
 
-            k = prob_addition
-
             prob_addition += Stnfe1*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne1))
             prob_addition += Stnfe0*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne0))
 
@@ -480,8 +478,6 @@ class GH:
         else: # u_label = 0
             prob_addition += Sef0*math.log(p/(1-p)) + f0*math.log(1-p) - math.log(p)
             prob_addition += Sef1*math.log(q/(1-q)) + f1*math.log(1-q)
-
-            k = prob_addition
 
             prob_addition += Stnfe0*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne0))
             prob_addition += Stnfe1*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne1))
