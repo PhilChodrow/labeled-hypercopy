@@ -494,16 +494,7 @@ class GH:
 
         return prob_addition
     
-    def log_likelihood_expected_q(self, e_index, theta, label):
-        # assume uniform distribution for now
-        # e_index = e_prime_index...
-        summation = 0
-        for f_index in range(e_index):
-            for u_index in self.edge_members[f_index]:
-                summation += self.log_likelihood(f_index, u_index, e_index, theta, label) / len(self.edge_members[f_index]) / e_index
 
-
-        return summation
 
 
 
