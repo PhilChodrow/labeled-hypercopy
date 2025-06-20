@@ -152,19 +152,27 @@ class GH:
         novel_nodes = set(e_prime) - set(prev_nodes)
         novel_labels = [node_labels[node] for node in novel_nodes]
 
-        novel_num_u, novel_num_r = self.set_values(len(novel_labels) - sum(novel_labels), sum(novel_labels), u_label)
+        novel_num_u, novel_num_r = self.set_values(len(novel_labels) - sum(novel_labels), sum(novel_labels), u_label)        
       
         # Get the external nodes
         # total_num_1 = sum(node_labels)
         # total_num_0 = len(node_labels) - total_num_1
-        all_ext_num_0 = self.total_num_0 - e_num_0
-        all_ext_num_1 = self.total_num_1 - e_num_1
+        # CHANGE HERE: substracted novel nodes from total external nodes as novel nodes are not possible external nodes
+
+        # previously all_ext_num_0 = self.total_num_0 - e_num_0
+        # previously all_ext_num_1 = self.total_num_1 - e_num_1
+
+        # new code
+        all_ext_nodes = set(prev_nodes) - e
+        all_ext_labels = [node_labels[node] for node in all_ext_nodes]
+
+        all_ext_num_1 = sum(all_ext_labels)
+        all_ext_num_0 = len(all_ext_labels) - sum(all_ext_labels) 
 
         # external_nodes = set(prev_nodes).intersection(e_prime) - set(e)
         # external_labels = [node_labels[node] for node in external_nodes]           
         ext_num_u = e_prime_num_u - int_num_u - novel_num_u
         ext_num_r = e_prime_num_r - int_num_r - novel_num_r
-
 
         all_ext_num_u, all_ext_num_r = self.set_values(all_ext_num_0, all_ext_num_1, u_label)
         # ext_num_u, ext_num_r = self.set_values(len(external_labels) - sum(external_labels), sum(external_labels), u_label)
@@ -195,7 +203,95 @@ class GH:
         P6 = P6_numer / P6_denom
         prob_e_prime = P1 * P2 * P3 * P4  * P5 * P6
         
-        prob = prob_e * prob_u * prob_e_prime
+        prob = prob_e_prime * prob_e * prob_u
+
+        return(prob)
+    
+    def likelihood_given_u_f(self, e_index, u_index, e_prime_index, theta):
+        # NOTE: e = f, e_prime = e
+        p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
+
+        node_labels = self.node_labels
+
+        e = self.edge_members[e_index]
+        e_prime = self.edge_members[e_prime_index]
+        u_label = node_labels[u_index]
+
+        intersect = e.intersection(e_prime)
+
+        if len(intersect) == 0:
+            return(0)
+        if u_index not in e_prime:
+            return(0)
+
+        node_labels = self.get_labels()
+        e_labels = [node_labels[node] for node in e]
+        e_prime_labels = [node_labels[node] for node in e_prime]
+        int_labels = [node_labels[node] for node in intersect]
+
+        # Get edge and intersection sizes
+        e_prime_num_1 = sum(e_prime_labels)
+        e_prime_num_0 = len(e_prime_labels) - e_prime_num_1
+        e_num_1 = sum(e_labels)
+        e_num_0 = len(e_labels) - e_num_1
+        e_num_u, e_num_r = self.set_values(e_num_0, e_num_1, u_label)
+        e_prime_num_u, e_prime_num_r = self.set_values(e_prime_num_0, e_prime_num_1, u_label)
+        int_num_u, int_num_r = self.set_values(len(int_labels) - sum(int_labels), sum(int_labels), u_label)
+
+        # Get the new nodes
+        prev_edges = self.edge_members[0:e_prime_index]
+        prev_nodes = list(range(self.last_added[e_prime_index - 1] + 1))
+
+        novel_nodes = set(e_prime) - set(prev_nodes)
+        novel_labels = [node_labels[node] for node in novel_nodes]
+
+        novel_num_u, novel_num_r = self.set_values(len(novel_labels) - sum(novel_labels), sum(novel_labels), u_label)        
+      
+        # Get the external nodes
+        # total_num_1 = sum(node_labels)
+        # total_num_0 = len(node_labels) - total_num_1
+        # CHANGE HERE: substracted novel nodes from total external nodes as novel nodes are not possible external nodes
+
+        # previously all_ext_num_0 = self.total_num_0 - e_num_0
+        # previously all_ext_num_1 = self.total_num_1 - e_num_1
+
+        # new code
+        all_ext_nodes = set(prev_nodes) - e
+        all_ext_labels = [node_labels[node] for node in all_ext_nodes]
+
+        all_ext_num_1 = sum(all_ext_labels)
+        all_ext_num_0 = len(all_ext_labels) - sum(all_ext_labels) 
+
+        # external_nodes = set(prev_nodes).intersection(e_prime) - set(e)
+        # external_labels = [node_labels[node] for node in external_nodes]           
+        ext_num_u = e_prime_num_u - int_num_u - novel_num_u
+        ext_num_r = e_prime_num_r - int_num_r - novel_num_r
+
+        all_ext_num_u, all_ext_num_r = self.set_values(all_ext_num_0, all_ext_num_1, u_label)
+        # ext_num_u, ext_num_r = self.set_values(len(external_labels) - sum(external_labels), sum(external_labels), u_label)
+
+        P1 = p ** (int_num_u - 1)
+        P2 = (1 - p) ** (e_num_u - int_num_u)
+        P3 = q ** (int_num_r)
+        P4 = (1 - q) ** (e_num_r - int_num_r)
+
+        if ext_num_u == 0:
+            prob_those_ext_u = 1
+        else:
+            prob_those_ext_u = 1 / ss.binom(all_ext_num_u, ext_num_u) # formerly: ext_num_u / all_ext_num_u
+        if ext_num_r == 0:
+            prob_those_ext_r = 1
+        else: prob_those_ext_r = 1 / ss.binom(all_ext_num_r, ext_num_r) # formerly: ext_num_r / all_ext_num_r
+
+        P5_numer = (math.e ** (-gamma_eu)) * (gamma_eu ** ext_num_u) * prob_those_ext_u * (math.e ** (-gamma_er)) * (gamma_er ** ext_num_r) * prob_those_ext_r
+        P5_denom = math.factorial(ext_num_u) * math.factorial(ext_num_r)
+        P5 = P5_numer / P5_denom
+        P6_numer = (math.e ** (-gamma_nu)) * (gamma_nu ** novel_num_u) * (math.e ** (-gamma_nr)) * (gamma_nr ** novel_num_r)
+        P6_denom = (math.factorial(novel_num_u) * math.factorial(novel_num_r))
+        P6 = P6_numer / P6_denom
+        prob_e_prime = P1 * P2 * P3 * P4  * P5 * P6
+        
+        prob = prob_e_prime
 
         return(prob)
 
@@ -284,3 +380,132 @@ class GH:
         # node_dict = dict(zip(self.nodes, self.node_labels))
         # big_H.set_node_attributes(node_dict, name = "label")
         # return(big_H)
+
+    def log_likelihood_given_u_f(self, e_index, u_index, e_prime_index, theta, label):
+
+        # log_likelihood of an edge e_prime given node u and edge e
+
+       
+        # can define node labels within the function with the line node_labels = self.get_labels(),
+        # but the current config is betteer for testing
+        p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
+
+        node_labels = label
+        #NOTE: f = e, e = eprime in the following code
+
+        e = self.edge_members[e_prime_index]
+        f = self.edge_members[e_index]
+        u_label = node_labels[u_index]
+
+        intersect = e.intersection(f)
+
+        if len(intersect) == 0:
+            return np.log(0)
+        elif u_index not in e:
+            return np.log(0)
+
+        intersect = set(intersect)
+
+        e_labels = [node_labels[node] for node in e]
+        f_labels = [node_labels[node] for node in f]
+        int_labels = [node_labels[node] for node in intersect]
+
+        # nodes added in steps 3, 4
+        Sef1 = sum(int_labels)
+        Sef0 = len(int_labels) - sum(int_labels)
+
+
+        f1 = sum(f_labels)
+        f0 = len(f_labels) - sum(f_labels)
+
+        e1 = sum(e_labels)
+        e0 = len(e_labels) - sum(e_labels)
+
+        prev_edges = self.edge_members[0:e_prime_index]
+        prev_nodes = list(range(self.last_added[e_prime_index - 1] + 1))
+
+
+        # novel nodes (added via steps 7, 8)
+        novel_nodes = set(e) - set(prev_nodes)
+        novel_labels = [node_labels[node] for node in novel_nodes]
+
+        Snte1 = sum(novel_labels)
+        Snte0 = len(novel_labels) - sum(novel_labels)
+
+
+        # external nodes in e (added via steps 5, 6)
+        external_nodes = set(prev_nodes) - set(f)
+        external_node_labels = [node_labels[node] for node in external_nodes]  
+
+        
+        external_nodes_in_e = external_nodes.intersection(e)
+        external_nodes_in_e_labels = [node_labels[node] for node in external_nodes_in_e] 
+
+        Stnfe1 = sum(external_nodes_in_e_labels)
+        
+        Stnfe0 = len(external_nodes_in_e_labels) - sum(external_nodes_in_e_labels)
+
+        # nodes not added in step 5, 6, but could be choosen
+        external_nodes_not_in_e = external_nodes - (e)
+        external_nodes_not_in_e_labels = [node_labels[node] for node in external_nodes_not_in_e]  
+
+        Stnfne1 = sum(external_nodes_not_in_e_labels)
+        Stnfne0 = len(external_nodes_not_in_e_labels) - sum(external_nodes_not_in_e_labels)
+
+
+        # constant term used to check validity of function... delete later
+        const1 = sum(external_node_labels)
+        const0 = len(external_node_labels) - sum(external_node_labels)
+
+        # print("const set = " + str(len(const_set)))
+
+        # Now, code prob in components and add
+        prob_addition = 0
+        if u_label == 1:
+            prob_addition += Sef1*math.log(p/(1-p)) + f1*math.log(1-p) - math.log(p)
+            prob_addition += Sef0*math.log(q/(1-q)) + f0*math.log(1-q)
+
+            k = prob_addition
+
+            prob_addition += Stnfe1*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne1))
+            prob_addition += Stnfe0*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne0))
+
+            # Factor constant in terms of input and determined only by f and z^t... can be ignored for later maximization
+            prob_addition += -1*math.log(ss.factorial(const1, exact=True)) + -1*math.log(ss.factorial(const0, exact=True))
+
+            prob_addition += (Snte1*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte1)))
+            prob_addition += (Snte0*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte0)))
+
+            
+        else: # u_label = 0
+            prob_addition += Sef0*math.log(p/(1-p)) + f0*math.log(1-p) - math.log(p)
+            prob_addition += Sef1*math.log(q/(1-q)) + f1*math.log(1-q)
+
+            k = prob_addition
+
+            prob_addition += Stnfe0*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne0))
+            prob_addition += Stnfe1*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne1))
+
+           # Factor constant in terms of input and determined only by f and z^t... can be ignored for later maximization
+            prob_addition += -1*math.log(ss.factorial(const1, exact=True)) + -1*math.log(ss.factorial(const0, exact=True))
+
+            prob_addition += (Snte0*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte0)))
+            prob_addition += (Snte1*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte1)))
+
+        return prob_addition
+    
+    def log_likelihood_expected_q(self, e_index, theta, label):
+        # assume uniform distribution for now
+        # e_index = e_prime_index...
+        summation = 0
+        for f_index in range(e_index):
+            for u_index in self.edge_members[f_index]:
+                summation += self.log_likelihood(f_index, u_index, e_index, theta, label) / len(self.edge_members[f_index]) / e_index
+
+
+        return summation
+
+
+
+
+        
