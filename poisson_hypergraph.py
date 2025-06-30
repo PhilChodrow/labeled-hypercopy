@@ -453,11 +453,9 @@ class GH:
         Stnfne0 = len(external_nodes_not_in_e_labels) - sum(external_nodes_not_in_e_labels)
 
 
-        # constant term used to check validity of function... delete later
-        const1 = sum(external_node_labels)
-        const0 = len(external_node_labels) - sum(external_node_labels)
+        Stnf1 = sum(external_node_labels)
+        Stnf0 = len(external_node_labels) - sum(external_node_labels)
 
-        # print("const set = " + str(len(const_set)))
 
         # Now, code prob in components and add
         prob_addition = 0
@@ -469,7 +467,7 @@ class GH:
             prob_addition += Stnfe0*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne0))
 
             # Factor constant in terms of input and determined only by f and z^t... can be ignored for later maximization
-            prob_addition += -1*math.log(ss.factorial(const1, exact=True)) + -1*math.log(ss.factorial(const0, exact=True))
+            prob_addition += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
 
             prob_addition += (Snte1*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte1)))
             prob_addition += (Snte0*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte0)))
@@ -483,16 +481,258 @@ class GH:
             prob_addition += Stnfe1*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne1))
 
            # Factor constant in terms of input and determined only by f and z^t... can be ignored for later maximization
-            prob_addition += -1*math.log(ss.factorial(const1, exact=True)) + -1*math.log(ss.factorial(const0, exact=True))
+            prob_addition += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
 
             prob_addition += (Snte0*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte0)))
             prob_addition += (Snte1*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte1)))
 
         return prob_addition
     
+    def expected_log_likelihood(self, e_prime_index, theta, label):
+        # Note: e_prime = e, e = f for the following code
+        # log likelihood of e_prime expected
+        p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
 
 
+        node_labels = label
+        prev_edges = self.edge_members[0:e_prime_index]
+        prev_nodes = list(range(self.last_added[e_prime_index - 1] + 1))
+        #NOTE: f = e, e = eprime in the following code
+
+        e = self.edge_members[e_prime_index]
 
 
+        # find all possible f edges that can generate e (assume uniform random for this)
+        canidate_f_indexes = []
+        for i in range(len(prev_edges)):
+            if len(set(prev_edges[i]).intersection(set(e))) != 0:
+                canidate_f_indexes.append(i)
+
+        # find all possible u within each f that can generate e... calc prob
+        log_prob_sum = 0
+        for f in canidate_f_indexes:
+            canidates_u = []
+            for potiential_u in e:
+                if potiential_u in prev_edges[f]:
+                    canidates_u.append(potiential_u)
+
+            for u in canidates_u:
+                log_prob_sum += self.expected_log_likelihood_given_f(e_prime_index, f, theta, label) / len(canidate_f_indexes)
+       
+        return log_prob_sum
+    
+    def expected_log_likelihood_given_f(self, e_prime_index, f, theta, label):
+        node_labels = label
+        prev_edges = self.edge_members[0:e_prime_index]
+
+        p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
+        e = self.edge_members[e_prime_index] 
+
+
+        log_prob_sum = 0
+        canidates_u = []
+        for potiential_u in e:
+            if potiential_u in prev_edges[f]:
+                canidates_u.append(potiential_u)
+
+        if (len(canidates_u) == 0):
+            return np.log(0)
+        # TODO: make more efficient by summing u with the same label in f and multiplying rather than calling big function a bunch
+        for u in canidates_u:
+            log_prob_sum += self.log_likelihood_given_u_f(f, u, e_prime_index, theta, label) / len(canidates_u)
+
+        return log_prob_sum
+
+    def expected_log_likelihood_total(self, theta, label):
+        summation = 0
+        for e_index in range(len(self.get_edges())-1):
+            summation += self.expected_log_likelihood(e_index+1, theta, label) / (len(self.get_edges()) - 1)
+        
+        return summation
+
+
+    def greedy_expectation_step_given_f(self, v_index, f_index, e_index, theta, label):
+        # Note: label is before the change, v_index is the index of the node that will have its label flipped
+        node_labels = label
+        prev_nodes = list(range(self.last_added[e_index - 1] + 1))
+        p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
+        zero_to_one = False
+        # determine if 0->1 or 1->0 change
+        if node_labels[v_index] == 0:
+            # 0->1 change
+            zero_to_one = True
+        
+        # determine case node falls into and calculate appropriate expectation change
+        e = self.edge_members[e_index]
+        f = self.edge_members[f_index]
+        intersect = e.intersection(f)
+
+        if len(intersect) == 0:
+            return np.log(0)
+
+        intersect_labels = [node_labels[node] for node in intersect]
+
+        # before changing the label!
+        prob_u_1_label = sum(intersect_labels) / len(intersect_labels)
+        prob_u_0_label = (len(intersect_labels) - sum(intersect_labels)) / len(intersect_labels)
+
+        diff_in_expectation = 0
+        # case 1+6
+        # legit case to just calc from scratch here...
+        if v_index in intersect:
+            novel_nodes = set(e) - set(prev_nodes)
+            novel_labels = [node_labels[node] for node in novel_nodes]
+
+            e_labels = [node_labels[node] for node in e]
+            f_labels = [node_labels[node] for node in f]
+            int_labels = [node_labels[node] for node in intersect]
+
+            Sef1 = sum(int_labels)
+            Sef0 = len(int_labels) - sum(int_labels)
+
+
+            f1 = sum(f_labels)
+            f0 = len(f_labels) - sum(f_labels)
+
+            e1 = sum(e_labels)
+            e0 = len(e_labels) - sum(e_labels)
+
+            Snte1 = sum(novel_labels)
+            Snte0 = len(novel_labels) - sum(novel_labels)
+
+
+            # external nodes in e (added via steps 5, 6)
+            external_nodes = set(prev_nodes) - set(f)
+            external_node_labels = [node_labels[node] for node in external_nodes]  
+
+            
+            external_nodes_in_e = external_nodes.intersection(e)
+            external_nodes_in_e_labels = [node_labels[node] for node in external_nodes_in_e] 
+
+            Stnfe1 = sum(external_nodes_in_e_labels)
+            
+            Stnfe0 = len(external_nodes_in_e_labels) - sum(external_nodes_in_e_labels)
+
+            # nodes not added in step 5, 6, but could be choosen
+            external_nodes_not_in_e = external_nodes - (e)
+            external_nodes_not_in_e_labels = [node_labels[node] for node in external_nodes_not_in_e]  
+
+            Stnfne1 = sum(external_nodes_not_in_e_labels)
+            Stnfne0 = len(external_nodes_not_in_e_labels) - sum(external_nodes_not_in_e_labels)
+
+
+            Stnf1 = sum(external_node_labels)
+            Stnf0 = len(external_node_labels) - sum(external_node_labels) 
+
+            # calc L1, L0
+            L1 = 0
+            L1 += Sef1*math.log(p/(1-p)) + f1*math.log(1-p) - math.log(p)
+            L1 += Sef0*math.log(q/(1-q)) + f0*math.log(1-q)
+
+            L1 += Stnfe1*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne1))
+            L1 += Stnfe0*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne0))
+            L1 += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
+
+            L1 += (Snte1*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte1)))
+            L1 += (Snte0*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte0)))
+
+            L0 = 0
+            L0 += Sef0*math.log(p/(1-p)) + f0*math.log(1-p) - math.log(p)
+            L0 += Sef1*math.log(q/(1-q)) + f1*math.log(1-q)
+
+            L0 += Stnfe0*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne0))
+            L0 += Stnfe1*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne1))
+
+            L0 += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
+
+            L0 += (Snte0*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte0)))
+            L0 += (Snte1*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte1)))
+            if zero_to_one:
+                NT1 = np.log(1-p) - np.log(1-q) + np.log(p/(1-p)) - np.log(q/(1-q))
+                NT0 = np.log(1-q) - np.log(1-p) + np.log(q/(1-q)) - np.log(p/(1-p)) 
+                prob_v_given_f = 1/len(intersect_labels)
+
+                diff_in_expectation = prob_u_0_label*NT0 + prob_u_1_label*NT1 - prob_v_given_f*(L0+NT0) + prob_v_given_f*(L1+NT1)
+            else:
+                NT0 = np.log(1-p) - np.log(1-q) + np.log(p/(1-p)) - np.log(q/(1-q))
+                NT1 = np.log(1-q) - np.log(1-p) + np.log(q/(1-q)) - np.log(p/(1-p)) 
+
+                prob_v_given_f = 1/len(intersect_labels)
+                diff_in_expectation = prob_u_0_label*NT0 + prob_u_1_label*NT1 + prob_v_given_f*(L0+NT0) - prob_v_given_f*(L1+NT1)
+
+        
+        # case 2
+        if v_index not in e and v_index in f:
+            NT0, NT1 = 0, 0
+            if zero_to_one:
+                NT0 = np.log(1-q) - np.log(1-p)
+                NT1 = np.log(1-p) - np.log(1-q)
+            else:
+                NT1 = np.log(1-q) - np.log(1-p)
+                NT0 = np.log(1-p) - np.log(1-q)
+            diff_in_expectation = NT0 * prob_u_0_label + NT1 * prob_u_1_label
+
+        # case 3
+        if v_index not in e and v_index not in f and v_index in prev_nodes:
+            # calc neccessary cardinalities
+            external_nodes = set(prev_nodes) - set(f)
+            external_node_labels = [node_labels[node] for node in external_nodes]  
+
+            external_nodes_not_in_e = external_nodes - (e)
+            external_nodes_not_in_e_labels = [node_labels[node] for node in external_nodes_not_in_e]  
+
+            Stnfne1 = sum(external_nodes_not_in_e_labels)
+            Stnfne0 = len(external_nodes_not_in_e_labels) - sum(external_nodes_not_in_e_labels)
+ 
+            Stnf1 = sum(external_node_labels)
+            Stnf0 = len(external_node_labels) - sum(external_node_labels)
+            
+            NT0, NT1 = 0, 0
+            if zero_to_one:
+                NT1 = np.log(Stnfne1 + 1) - np.log(Stnfne0) - np.log(Stnf1 + 1) + np.log(Stnf0)
+                NT0 = -1*np.log(Stnfne0) + np.log(Stnfne1 + 1) - np.log(Stnf1 + 1) + np.log(Stnf0)
+            else:
+                NT0 = np.log(Stnfne0 + 1) - np.log(Stnfne1) - np.log(Stnf0 + 1) + np.log(Stnf1)
+                NT1 = -1*np.log(Stnfne1) + np.log(Stnfne0 + 1) - np.log(Stnf0 + 1) + np.log(Stnf1)
+
+            diff_in_expectation = NT0 * prob_u_0_label + NT1 * prob_u_1_label
+        
+        # case 4
+        if v_index in e and v_index not in f and v_index in prev_nodes:
+            external_nodes = set(prev_nodes) - set(f)
+            external_node_labels = [node_labels[node] for node in external_nodes]  
+
+            Stnf1 = sum(external_node_labels)
+            Stnf0 = len(external_node_labels) - sum(external_node_labels)
+
+            NT0, NT1 = 0, 0
+            if zero_to_one:
+                NT1 = np.log(gamma_eu) - np.log(gamma_er) - np.log(Stnf1 + 1) + np.log(Stnf0)
+                NT0 = -1*np.log(gamma_eu) + np.log(gamma_er) - np.log(Stnf1 + 1) + np.log(Stnf0)
+            else:
+                NT0 = np.log(gamma_eu) - np.log(gamma_er) - np.log(Stnf0 + 1) + np.log(Stnf1)
+                NT1 = -1*np.log(gamma_eu) + np.log(gamma_er) - np.log(Stnf0 + 1) + np.log(Stnf1)
+
+            diff_in_expectation = NT0 * prob_u_0_label + NT1 * prob_u_1_label
+        # case 5
+        if v_index in e and v_index not in prev_nodes:
+            novel_nodes = set(e) - set(prev_nodes)
+            novel_labels = [node_labels[node] for node in novel_nodes]
+
+            Snte1 = sum(novel_labels)
+            Snte0 = len(novel_labels) - sum(novel_labels)
+
+            if zero_to_one:
+                NT1 = np.log(gamma_nu) - np.log(gamma_nr) - np.log(Snte1 + 1) + np.log(Snte0)
+                NT0 = -1*np.log(gamma_nu) + np.log(gamma_nr) + np.log(Snte0) - np.log(Snte1 + 1)
+            else:
+                NT0 = np.log(gamma_nu) - np.log(gamma_nr) - np.log(Snte0 + 1) + np.log(Snte1)
+                NT1 = -1*np.log(gamma_nu) + np.log(gamma_nr) + np.log(Snte1) - np.log(Snte0 + 1) 
+
+            diff_in_expectation = NT0 * prob_u_0_label + NT1 * prob_u_1_label
+
+        return diff_in_expectation
+
+        # return delta expectation
 
         
