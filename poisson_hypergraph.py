@@ -406,7 +406,9 @@ class GH:
 
         intersect = set(intersect)
 
+   
         e_labels = [node_labels[node] for node in e]
+
         f_labels = [node_labels[node] for node in f]
         int_labels = [node_labels[node] for node in intersect]
 
@@ -511,13 +513,7 @@ class GH:
         # find all possible u within each f that can generate e... calc prob
         log_prob_sum = 0
         for f in canidate_f_indexes:
-            canidates_u = []
-            for potiential_u in e:
-                if potiential_u in prev_edges[f]:
-                    canidates_u.append(potiential_u)
-
-            for u in canidates_u:
-                log_prob_sum += self.expected_log_likelihood_given_f(e_prime_index, f, theta, label) / len(canidate_f_indexes)
+            log_prob_sum += self.expected_log_likelihood_given_f(e_prime_index, f, theta, label) / len(canidate_f_indexes)
        
         return log_prob_sum
     
@@ -543,13 +539,7 @@ class GH:
 
         return log_prob_sum
 
-    def expected_log_likelihood_total(self, theta, label):
-        summation = 0
-        for e_index in range(len(self.get_edges())-1):
-            summation += self.expected_log_likelihood(e_index+1, theta, label) / (len(self.get_edges()) - 1)
-        
-        return summation
-
+   
 
     def greedy_expectation_step_given_f(self, v_index, f_index, e_index, theta, label):
         # Note: label is before the change, v_index is the index of the node that will have its label flipped
@@ -732,7 +722,58 @@ class GH:
             diff_in_expectation = NT0 * prob_u_0_label + NT1 * prob_u_1_label
 
         return diff_in_expectation
+    
+    def f_prob_array_given_e(self, e_index, theta, label):
+        probs = np.full(e_index, -np.inf)
+        
+        for f_index in range(e_index):
+            if (len(self.get_edges()[f_index].intersection(self.get_edges()[e_index])) != 0):
+                # not entirely sure if this is legal
+                probs[f_index] = self.expected_log_likelihood_given_f(e_index, f_index, theta, label)
+                
+            # print("f_index and likelihood: " + str(f_index) + ", " + str(probs[f_index]))
+        if e_index != 0:
+            probs = ss.softmax(probs)
+            return probs
 
-        # return delta expectation
+    def weighted_expected_log_likelihood(self, e_prime_index, theta, label):
+        node_labels = label
+        prev_edges = self.edge_members[0:e_prime_index]
+        prev_nodes = list(range(self.last_added[e_prime_index - 1] + 1))
+        #NOTE: f = e, e = eprime in the following code
+
+        e = self.edge_members[e_prime_index]
+
+
+        # find all possible f edges that can generate e (assume uniform random for this)
+        canidate_f_indexes = []
+        for i in range(len(prev_edges)):
+            if len(set(prev_edges[i]).intersection(set(e))) != 0:
+                canidate_f_indexes.append(i)
+
+        f_probs = self.f_prob_array_given_e(e_prime_index, theta, label)
+
+        log_prob_sum = 0
+        for f in canidate_f_indexes:
+            log_prob_sum += self.expected_log_likelihood_given_f(e_prime_index, f, theta, label) * f_probs[f]
+       
+        return log_prob_sum
+    
+    def total_log_likelihood(self, theta, label):
+        log_prob = 0
+        # all edges but the first one
+        for e_index in range(len(self.get_edges())-1):
+            log_prob += self.expected_log_likelihood(e_index+1, theta, label)
+
+        return log_prob
+    
+    def total_weighted_expected_log_likelihood(self, theta, label):
+        total_prob = 0
+        for e in range(0, len(self.get_edges())-1):
+            total_prob += self.weighted_expected_log_likelihood(e+1, theta, label)
+
+        return total_prob
+
+    
 
         
