@@ -372,7 +372,7 @@ class GH:
                     self.total_num_1 += 1
 
             ## Add the edge to the hypergraph
-            # self.H.add_edge(e_prime)
+            self.H.add_edge(e_prime)
             self.edge_members.append(set(e_prime))
             self.last_added.append(last)
 
@@ -468,7 +468,6 @@ class GH:
             prob_addition += Stnfe1*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne1))
             prob_addition += Stnfe0*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne0))
 
-            # Factor constant in terms of input and determined only by f and z^t... can be ignored for later maximization
             prob_addition += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
 
             prob_addition += (Snte1*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte1)))
@@ -482,7 +481,6 @@ class GH:
             prob_addition += Stnfe0*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne0))
             prob_addition += Stnfe1*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne1))
 
-           # Factor constant in terms of input and determined only by f and z^t... can be ignored for later maximization
             prob_addition += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
 
             prob_addition += (Snte0*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte0)))
