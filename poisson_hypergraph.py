@@ -19,6 +19,9 @@ class GH:
         self.total_num_1 = sum(self.node_labels)
         self.total_num_0 = len(self.node_labels) - self.total_num_1
 
+        # helper for speed of gammaln
+        self.stored_gammaln = [ss.gammaln(k) for k in range(200)]
+
     def get_labels(self):
         return(self.node_labels)
     
@@ -465,26 +468,38 @@ class GH:
             prob_addition += Sef1*math.log(p/(1-p)) + f1*math.log(1-p) - math.log(p)
             prob_addition += Sef0*math.log(q/(1-q)) + f0*math.log(1-q)
 
-            prob_addition += Stnfe1*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne1))
-            prob_addition += Stnfe0*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne0))
+            prob_addition += Stnfe1*math.log(gamma_eu) - gamma_eu + self.gammaln_fast(Stnfne1+1)
+            prob_addition += Stnfe0*math.log(gamma_er) - gamma_er + self.gammaln_fast(Stnfne0+1)
 
-            prob_addition += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
+            # prob_addition += Stnfe1*math.log(gamma_eu) - gamma_eu + ss.gammaln(Stnfne1+1)
+            # prob_addition += Stnfe0*math.log(gamma_er) - gamma_er + ss.gammaln(Stnfne0+1)
 
-            prob_addition += (Snte1*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte1)))
-            prob_addition += (Snte0*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte0)))
+
+            prob_addition += -1*self.gammaln_fast(Stnf1+1) + -1*self.gammaln_fast(Stnf0+1)
+            # prob_addition += -1*ss.gammaln(Stnf1+1) + -1*ss.gammaln(Stnf0+1)
+
+            # prob_addition += (Snte1*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte1)))
+            # prob_addition += (Snte0*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte0)))
+
+            prob_addition += (Snte1*math.log(gamma_nu) - gamma_nu - self.gammaln_fast(Snte1+1))
+            prob_addition += (Snte0*math.log(gamma_nr) - gamma_nr - self.gammaln_fast(Snte0+1))
 
             
         else: # u_label = 0
             prob_addition += Sef0*math.log(p/(1-p)) + f0*math.log(1-p) - math.log(p)
             prob_addition += Sef1*math.log(q/(1-q)) + f1*math.log(1-q)
 
-            prob_addition += Stnfe0*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne0))
-            prob_addition += Stnfe1*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne1))
+            # prob_addition += Stnfe0*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne0))
+            # prob_addition += Stnfe1*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne1))
 
-            prob_addition += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
+            prob_addition += Stnfe0*math.log(gamma_eu) - gamma_eu + self.gammaln_fast(Stnfne0+1)
+            prob_addition += Stnfe1*math.log(gamma_er) - gamma_er + self.gammaln_fast(Stnfne1+1)
 
-            prob_addition += (Snte0*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte0)))
-            prob_addition += (Snte1*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte1)))
+            # prob_addition += -1*math.log(math.factorial(Stnf1)) + -1*math.log(math.factorial(Stnf0))
+            prob_addition += -1*self.gammaln_fast(Stnf1+1) + -1*self.gammaln_fast(Stnf0+1)
+
+            prob_addition += (Snte0*math.log(gamma_nu) - gamma_nu - self.gammaln_fast(Snte0+1))
+            prob_addition += (Snte1*math.log(gamma_nr) - gamma_nr - self.gammaln_fast(Snte1+1))
 
         return prob_addition
     
@@ -532,8 +547,24 @@ class GH:
         if (len(canidates_u) == 0):
             return np.log(0)
         # TODO: make more efficient by summing u with the same label in f and multiplying rather than calling big function a bunch
+        u_1_label_count = 0
+        u_1_index = None
+        u_0_label_count = 0
+        u_0_index = None
+
         for u in canidates_u:
-            log_prob_sum += self.log_likelihood_given_u_f(f, u, e_prime_index, theta, label) / len(canidates_u)
+            if (node_labels[u] == 1):
+                u_1_label_count += 1
+                u_1_index = u
+            else:
+                u_0_label_count += 1
+                u_0_index = u
+
+        if u_1_index != None:
+            log_prob_sum += self.log_likelihood_given_u_f(f, u_1_index, e_prime_index, theta, label) / len(canidates_u) * u_1_label_count
+        
+        if u_0_index != None:
+            log_prob_sum += self.log_likelihood_given_u_f(f, u_0_index, e_prime_index, theta, label) / len(canidates_u) * u_0_label_count
 
         return log_prob_sum
 
@@ -617,24 +648,24 @@ class GH:
             L1 += Sef1*math.log(p/(1-p)) + f1*math.log(1-p) - math.log(p)
             L1 += Sef0*math.log(q/(1-q)) + f0*math.log(1-q)
 
-            L1 += Stnfe1*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne1))
-            L1 += Stnfe0*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne0))
-            L1 += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
+            L1 += Stnfe1*math.log(gamma_eu) - gamma_eu + self.gammaln_fast(Stnfne1+1)
+            L1 += Stnfe0*math.log(gamma_er) - gamma_er + self.gammaln_fast(Stnfne0+1)
+            L1 += -1*self.gammaln_fast(Stnf1+1) + -1*self.gammaln_fast(Stnf0+1)
 
-            L1 += (Snte1*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte1)))
-            L1 += (Snte0*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte0)))
+            L1 += (Snte1*math.log(gamma_nu) - gamma_nu - self.gammaln_fast(Snte1+1))
+            L1 += (Snte0*math.log(gamma_nr) - gamma_nr - self.gammaln_fast(Snte0+1))
 
             L0 = 0
             L0 += Sef0*math.log(p/(1-p)) + f0*math.log(1-p) - math.log(p)
             L0 += Sef1*math.log(q/(1-q)) + f1*math.log(1-q)
 
-            L0 += Stnfe0*math.log(gamma_eu) - gamma_eu + math.log(math.factorial(Stnfne0))
-            L0 += Stnfe1*math.log(gamma_er) - gamma_er + math.log(math.factorial(Stnfne1))
+            L0 += Stnfe0*math.log(gamma_eu) - gamma_eu + self.gammaln_fast(Stnfne0+1)
+            L0 += Stnfe1*math.log(gamma_er) - gamma_er + self.gammaln_fast(Stnfne1+1)
 
-            L0 += -1*math.log(ss.factorial(Stnf1, exact=True)) + -1*math.log(ss.factorial(Stnf0, exact=True))
+            L0 += -1*self.gammaln_fast(Stnf1+1) + -1*self.gammaln_fast(Stnf0+1)
 
-            L0 += (Snte0*math.log(gamma_nu) - gamma_nu - math.log(math.factorial(Snte0)))
-            L0 += (Snte1*math.log(gamma_nr) - gamma_nr - math.log(math.factorial(Snte1)))
+            L0 += (Snte0*math.log(gamma_nu) - gamma_nu - self.gammaln_fast(Snte0+1))
+            L0 += (Snte1*math.log(gamma_nr) - gamma_nr - self.gammaln_fast(Snte1+1))
             if zero_to_one:
                 NT1 = np.log(1-p) - np.log(1-q) + np.log(p/(1-p)) - np.log(q/(1-q))
                 NT0 = np.log(1-q) - np.log(1-p) + np.log(q/(1-q)) - np.log(p/(1-p)) 
@@ -771,7 +802,11 @@ class GH:
             total_prob += self.weighted_expected_log_likelihood(e+1, theta, label)
 
         return total_prob
-
     
+    def gammaln_fast(self, k):
+        if k > 200:
+            return ss.gammaln(k)
+        else:
+            return self.stored_gammaln[k]
 
         
