@@ -916,7 +916,7 @@ class GH:
             return ss.gammaln(ks)
                 
         else:
-            if ks > 200:
+            if ks >= 200:
                 return ss.gammaln(ks)
             else:
                 return self.stored_gammaln[ks]
