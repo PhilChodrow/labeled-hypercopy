@@ -546,7 +546,6 @@ class GH:
 
         if (len(canidates_u) == 0):
             return np.log(0)
-        # TODO: make more efficient by summing u with the same label in f and multiplying rather than calling big function a bunch
         u_1_label_count = 0
         u_1_index = None
         u_0_label_count = 0
@@ -765,6 +764,115 @@ class GH:
             probs = ss.softmax(probs)
             return probs
 
+    def f_prob_array_given_e_array(self, e_index, theta, labels):
+        # compute nodes copied from canidate f to e as array
+        p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
+        e = self.get_edges()[e_index]
+        canidate_fs = self.get_edges()[:e_index]
+        prev_nodes = list(range(self.last_added[e_index - 1] + 1))
+
+        Sef = [f.intersection(e) for f in canidate_fs]
+        Sef1 = []
+        Sef0 = []
+        for intersect in Sef:
+            temp = [labels[node] for node in intersect]
+            Sef1.append(sum(temp))
+            Sef0.append(len(temp) - sum(temp))
+
+        Sef1 = np.array(Sef1)
+        Sef0 = np.array(Sef0)
+
+        f0 = []
+        f1 = []
+        for f in canidate_fs:
+            temp = [labels[node] for node in f]
+            f1.append(sum(temp))
+            f0.append(len(temp) - sum(temp))
+        
+        f0 = np.array(f0)
+        f1 = np.array(f1)
+
+      
+   
+        external_nodes = [set(prev_nodes) - set(f) for f in canidate_fs]
+        external_nodes_in_e = [set(external).intersection(e) for external in external_nodes]
+
+        Stnfe1 = []
+        Stnfe0 = []
+        for intersect in external_nodes_in_e:
+            temp = [labels[node] for node in intersect]
+
+            Stnfe1.append(sum(temp))
+            Stnfe0.append(len(temp) - sum(temp))
+
+        Stnfe1 = np.array(Stnfe1)
+        Stnfe0 = np.array(Stnfe0)
+
+        external_nodes_not_in_e = [external - e for external in external_nodes]
+
+        Stnfne1 = []
+        Stnfne0 = []
+        for intersect in external_nodes_not_in_e:
+            temp = [labels[node] for node in intersect]
+
+            Stnfne1.append(sum(temp))
+            Stnfne0.append(len(temp) - sum(temp))
+
+        Stnfne1 = np.array(Stnfne1)
+        Stnfne0 = np.array(Stnfne0)
+
+        Stnf1 = []
+        Stnf0 = []
+        for intersect in external_nodes:
+            temp = [labels[node] for node in intersect]
+
+            Stnf1.append(sum(temp))
+            Stnf0.append(len(temp) - sum(temp))
+        
+        Stnf1 = np.array(Stnf1)
+        Stnf0 = np.array(Stnf0)
+
+        novel_nodes = [set(e) - set(prev_nodes)]
+        Snte1 = []
+        Snte0 = []
+        for intersect in novel_nodes:
+            temp = [labels[node] for node in intersect]
+
+            Snte1.append(sum(temp))
+            Snte0.append(len(temp) - sum(temp))
+
+        Snte1 = np.array(Snte1)
+        Snte0 = np.array(Snte0)
+
+        L1 = 0
+        L1 += Sef1*math.log(p/(1-p)) + f1*math.log(1-p) - math.log(p)
+        L1 += Sef0*math.log(q/(1-q)) + f0*math.log(1-q)
+
+        L1 += Stnfe1*math.log(gamma_eu) - gamma_eu + self.gammaln_fast(Stnfne1+1)
+        L1 += Stnfe0*math.log(gamma_er) - gamma_er + self.gammaln_fast(Stnfne0+1)
+        L1 += -1*self.gammaln_fast(Stnf1+1) + -1*self.gammaln_fast(Stnf0+1)
+
+        L1 += (Snte1*math.log(gamma_nu) - gamma_nu - self.gammaln_fast(Snte1+1))
+        L1 += (Snte0*math.log(gamma_nr) - gamma_nr - self.gammaln_fast(Snte0+1))
+
+        L0 = 0
+        L0 += Sef0*math.log(p/(1-p)) + f0*math.log(1-p) - math.log(p)
+        L0 += Sef1*math.log(q/(1-q)) + f1*math.log(1-q)
+
+        L0 += Stnfe0*math.log(gamma_eu) - gamma_eu + self.gammaln_fast(Stnfne0+1)
+        L0 += Stnfe1*math.log(gamma_er) - gamma_er + self.gammaln_fast(Stnfne1+1)
+
+        L0 += -1*self.gammaln_fast(Stnf1+1) + -1*self.gammaln_fast(Stnf0+1)
+
+        L0 += (Snte0*math.log(gamma_nu) - gamma_nu - self.gammaln_fast(Snte0+1))
+        L0 += (Snte1*math.log(gamma_nr) - gamma_nr - self.gammaln_fast(Snte1+1))
+
+    
+
+        LLs = f1*L1 + f0*L0
+
+        return ss.softmax(LLs)
+
     def weighted_expected_log_likelihood(self, e_prime_index, theta, label):
         node_labels = label
         prev_edges = self.edge_members[0:e_prime_index]
@@ -803,10 +911,14 @@ class GH:
 
         return total_prob
     
-    def gammaln_fast(self, k):
-        if k > 200:
-            return ss.gammaln(k)
+    def gammaln_fast(self, ks):
+        if isinstance(ks, np.ndarray):
+            return ss.gammaln(ks)
+                
         else:
-            return self.stored_gammaln[k]
+            if ks > 200:
+                return ss.gammaln(ks)
+            else:
+                return self.stored_gammaln[ks]
 
         
