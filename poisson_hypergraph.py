@@ -768,7 +768,12 @@ class GH:
         # compute nodes copied from canidate f to e as array
         p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
         e = self.get_edges()[e_index]
-        canidate_fs = self.get_edges()[:e_index]
+        canidate_f_indexes = []
+        canidate_fs = []
+        for f_index in range(len(self.get_edges()[:e_index])):
+            if len(self.get_edges()[f_index].intersection(e)) != 0:
+                canidate_f_indexes.append(f_index)
+                canidate_fs.append(self.get_edges()[f_index])
         prev_nodes = list(range(self.last_added[e_index - 1] + 1))
 
         Sef = [f.intersection(e) for f in canidate_fs]
@@ -792,8 +797,6 @@ class GH:
         f0 = np.array(f0)
         f1 = np.array(f1)
 
-      
-   
         external_nodes = [set(prev_nodes) - set(f) for f in canidate_fs]
         external_nodes_in_e = [set(external).intersection(e) for external in external_nodes]
 
@@ -810,7 +813,7 @@ class GH:
 
         external_nodes_not_in_e = [external - e for external in external_nodes]
 
-        Stnfne1 = []
+        Stnfne1 = [] 
         Stnfne0 = []
         for intersect in external_nodes_not_in_e:
             temp = [labels[node] for node in intersect]
@@ -861,17 +864,38 @@ class GH:
 
         L0 += Stnfe0*math.log(gamma_eu) - gamma_eu + self.gammaln_fast(Stnfne0+1)
         L0 += Stnfe1*math.log(gamma_er) - gamma_er + self.gammaln_fast(Stnfne1+1)
-
         L0 += -1*self.gammaln_fast(Stnf1+1) + -1*self.gammaln_fast(Stnf0+1)
 
         L0 += (Snte0*math.log(gamma_nu) - gamma_nu - self.gammaln_fast(Snte0+1))
         L0 += (Snte1*math.log(gamma_nr) - gamma_nr - self.gammaln_fast(Snte1+1))
 
     
+        potential_us = [f.intersection(e) for f in canidate_fs]
+        # cannot broadcast... weird
+        u1 = []
+        u0 = []
+        for intersect in potential_us:
+            temp = [labels[node] for node in intersect]
 
-        LLs = f1*L1 + f0*L0
+            u1.append(sum(temp))
+            u0.append(len(temp) - sum(temp))
 
-        return ss.softmax(LLs)
+        u1 = np.array(u1)
+        u0 = np.array(u0)
+
+
+        #add these to LLs function
+        LLs = (u1*L1 + u0*L0) / (u1+u0)
+
+        prob_array = np.full(e_index, -np.inf)
+        
+        counter = 0
+        for f_index in canidate_f_indexes:
+            prob_array[f_index] = LLs[counter]
+            counter += 1
+
+
+        return ss.softmax(prob_array)
 
     def weighted_expected_log_likelihood(self, e_prime_index, theta, label):
         node_labels = label
@@ -912,6 +936,7 @@ class GH:
         return total_prob
     
     def gammaln_fast(self, ks):
+        # log factorial fast...
         if isinstance(ks, np.ndarray):
             return ss.gammaln(ks)
                 
