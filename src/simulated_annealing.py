@@ -19,7 +19,7 @@ import csv
 import random
 import networkx as nx
 import math
-from sklearn.metrics import normalized_mutual_info_score
+from sklearn.metrics import normalized_mutual_info_score, adjusted_rand_score
 from scipy.stats import norm
 import statistics
 
@@ -38,7 +38,8 @@ class SimulatedAnnealingApprox:
 
         self.likelihoods_per_step = []
         self.nmis_per_step = []
-        self.f_e_pairs = self.initialize_f_e_pairs()
+        self.aris_per_step = []
+        self.f_e_pairs = self.initalize_f_e_pairs_adjustable_approx_bound(200)
 
         # TODO add initial, random likelihood
         self.likelihoods_per_step.append(self.calculate_likelihood_with_f_e_pairs(self.labels))
@@ -70,6 +71,8 @@ class SimulatedAnnealingApprox:
             pair = self.f_e_pairs[i]
             arr[pair.e_index-1] += self.f_e_pairs[i].calculate_prob(self.theta, new_labels) * self.f_e_pairs[i].weight
         
+        # TODO remove after testing
+        arr[arr == 0] = 1
         return np.sum(np.log(arr))
     
     def calculate_likelihood_with_f_e_pairs_greedy(self, changed_label_index, changed_label_value):
@@ -82,6 +85,10 @@ class SimulatedAnnealingApprox:
             # print(self.f_e_pairs[i].greedy_calculate_prob(changed_label_index, changed_label_value))
 
             arr[pair.e_index-1] += self.f_e_pairs[i].greedy_calculate_prob(changed_label_index, changed_label_value) * self.f_e_pairs[i].weight
+
+        # print(arr)
+        # TODO remove after testing
+        arr[arr == 0] = 1
         
         return np.sum(np.log(arr))
     
@@ -108,7 +115,7 @@ class SimulatedAnnealingApprox:
         # TODO: END TEMPORARY FOR TESTING 
      
         # calculate prob with f_e_pairs
-        T0 = len(self.g.nodes) * 50
+        T0 = len(self.g.nodes) * 20
         # T = T0-self.steps_taken
         # T = .1-(self.steps_taken/T0)*.1
 
@@ -253,18 +260,23 @@ class SimulatedAnnealingApprox:
         elif epoch > 0 and epoch < 5:
             if self.standard_deviation == None:
                 self.standard_deviation = statistics.stdev(self.LL_change_data)
+                print(self.standard_deviation)
                 # print(self.standard_deviation)
                 if math.isnan(self.standard_deviation):
+                    print("back sd")
                     self.standard_deviation = 10
 
             # since bad accept prob, assume delta_likelihood is negative
             sd_away = abs(delta_likelihood / self.standard_deviation)
-            bad_accept_prob = norm.pdf(sd_away, loc=0, scale=1)
+            bad_accept_prob = norm.pdf(sd_away, loc=0, scale=2)
             # print(bad_accept_prob)
 
         elif epoch >= 5:
             sd_away = abs(delta_likelihood / self.standard_deviation)
-            bad_accept_prob = norm.pdf(sd_away, loc=0, scale=1-(min(epoch, 20)-5)/15)
+            bad_accept_prob = norm.pdf(sd_away, loc=0, scale=2-2*(min(epoch, 20))/20)
+
+            # bad_accept_prob = norm.pdf(sd_away, loc=0, scale=1)
+
 
         # to determine if annealing schedule is good
         # bad_accept_prob = .1
@@ -289,6 +301,7 @@ class SimulatedAnnealingApprox:
             self.labels = new_labels
             self.likelihoods_per_step.append(new_likelihood)
             self.nmis_per_step.append(normalized_mutual_info_score(self.g.get_labels(), self.labels))
+            self.aris_per_step.append(adjusted_rand_score(self.g.get_labels(), self.labels))
 
 
             self.update_f_e_pairs_labels(node_to_switch, new_labels[node_to_switch])
@@ -304,6 +317,7 @@ class SimulatedAnnealingApprox:
             self.labels = new_labels
             self.likelihoods_per_step.append(new_likelihood)
             self.nmis_per_step.append(normalized_mutual_info_score(self.g.get_labels(), self.labels))
+            self.aris_per_step.append(adjusted_rand_score(self.g.get_labels(), self.labels))
 
             self.update_f_e_pairs_labels(node_to_switch, new_labels[node_to_switch])
         
@@ -313,6 +327,7 @@ class SimulatedAnnealingApprox:
             # print(g.get_labels())
             self.likelihoods_per_step.append(self.likelihoods_per_step[-1])
             self.nmis_per_step.append(self.nmis_per_step[-1])
+            self.aris_per_step.append(self.aris_per_step[-1])
 
 
         # with open('senate_bills_results.csv', 'a', newline="") as file:
@@ -345,6 +360,23 @@ class SimulatedAnnealingApprox:
             if k > 0:
                 for f_index in canidate_f_indexes:
                     f_e_pairs.append(FEPair(self.g, e_index, f_index, 1/len(canidate_f_indexes), self.labels, self.theta))
+
+    def initalize_f_e_pairs_adjustable_approx_bound(self, bound):
+        f_e_pairs = []
+        for e_index in range(1, len(self.g.get_edges())):
+            e = self.g.get_edges()[e_index]
+            ks = []
+            canidate_f_indexes = []
+            for f_index in range(e_index):
+                f = self.g.get_edges()[f_index]
+                inter_size = len(e.intersection(f))
+
+                if (inter_size != 0):
+                    canidate_f_indexes.append((f_index, inter_size))
+            
+            canidate_f_indexes = sorted(canidate_f_indexes, key=lambda x: x[1])
+            for f_pair in canidate_f_indexes[-min(bound, len(canidate_f_indexes)):]:
+                f_e_pairs.append(FEPair(self.g, e_index, f_pair[0], 1/len(canidate_f_indexes), self.labels, self.theta))
 
         return f_e_pairs
         
@@ -447,10 +479,10 @@ def simulated_annealing_approx_likelihood(g, theta):
         # try new move
         new_labels = generate_step(labels)
 
-        if step % 10 == 0:
-            new_labels = generate_step_flip_flop(labels, g)
-        else:
-            new_labels = generate_step(labels)
+        # if step % 10 == 0:
+        #     new_labels = generate_step_flip_flop(labels, g)
+        # else:
+        #     new_labels = generate_step(labels)
         new_likelihood = g.total_log_likelihood_approx(theta, new_labels)
         delta_likelihood = new_likelihood - likelihoods_per_step[-1]
 
@@ -471,9 +503,11 @@ def simulated_annealing_approx_likelihood(g, theta):
         elif epoch > 0 and epoch < 5:
             if standard_deviation == None:
                 standard_deviation = statistics.stdev(LL_change_data)
-                # print(standard_deviation)
+                print(standard_deviation)
                 if math.isnan(standard_deviation):
                     standard_deviation = 10
+
+
 
             # since bad accept prob, assume delta_likelihood is negative
             sd_away = abs(delta_likelihood / standard_deviation)
@@ -482,18 +516,10 @@ def simulated_annealing_approx_likelihood(g, theta):
 
         elif epoch >= 5:
             sd_away = abs(delta_likelihood / standard_deviation)
-            bad_accept_prob = norm.pdf(sd_away, loc=0, scale=1-(epoch-5)/15)
+            bad_accept_prob = norm.pdf(sd_away, loc=0, scale=1-(min(epoch, 20)-5)/15)
 
-        # # to determine if annealing schedule is good
-        # bad_accept_prob = .1
 
-        # print(math.exp(-(new_likelihood - likelihoods_per_step[-1])/T))
-        # print(-(new_likelihood - likelihoods_per_step[-1])/T)
-        # print(math.exp(-(new_likelihood - likelihoods_per_step[-1])/(new_likelihood+likelihoods_per_step[-1])/T))
-        # delete later
-        # if new_likelihood < likelihoods_per_step[-1]:
-        #     print("bad prop accept prob")
-        #     print(math.exp(-1*(new_likelihood-likelihoods_per_step[-1])/(new_likelihood+likelihoods_per_step[-1])/T))
+
 
 
         # prob_bad_acceptance = math.exp(-(-1*new_likelihood+likelihoods_per_step[-1])/T)
