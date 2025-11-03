@@ -22,6 +22,8 @@ class GH:
         # helper for speed of gammaln
         self.stored_gammaln = [ss.gammaln(k) for k in range(200)]
 
+        self.canidate_f_indexes_approx = None
+
     def get_labels(self):
         return(self.node_labels)
     
@@ -997,8 +999,8 @@ class GH:
         notcop0 = len(not_copied_nodes_labels) - notcop1
 
         # find probs of u being label 1 and 0
-        f_labels = [node_labels[node] for node in f]
-        prob_u_label_equals_1 = sum(f_labels) / len(f_labels)
+        possible_u_labels = [node_labels[node] for node in f.intersection(e)]
+        prob_u_label_equals_1 = sum(possible_u_labels) / len(possible_u_labels)
         prob_u_label_equals_0 = 1 - prob_u_label_equals_1
 
         # calculate prob of e given f and u_label = 1
@@ -1054,21 +1056,29 @@ class GH:
     def total_log_likelihood_approx(self, theta, labels):
         # e_index 0 must be given...
 
-        summation = 0
+        if self.canidate_f_indexes_approx == None:
+            self.canidate_f_indexes_approx = []
+            # the first e_index is not considered, thus no canidate f
+            self.canidate_f_indexes_approx.append([])
+            for e_index in range(1, len(self.get_edges())):
+                self.canidate_f_indexes_approx.append(self.generate_canidate_f_approx(e_index))
+
+        arr = np.zeros(len(self.get_edges())-1)
         for e_index in range(1, len(self.get_edges())):
             # add all edges together
             e_sum = 0
-            canidate_f_indexes = self.generate_canidate_f_approx(e_index)
-            for f_index in canidate_f_indexes:
+            for f_index in self.canidate_f_indexes_approx[e_index]:
                 e_sum += self.p_e_given_f(theta, labels, e_index, f_index)
             
-            e_sum /= len(canidate_f_indexes) # divide by possible f_choices
-            summation += np.log(e_sum)
+            e_sum /= len(self.canidate_f_indexes_approx[e_index]) # divide by possible f_choices
+            arr[e_index-1] = e_sum
 
-        return summation
+        # arr = np.log(arr)
+        return np.sum(np.log(arr))
 
     def total_log_likelihood_approx_batch(self, theta, labels):
         # e_index 0 must be given...
+        
 
         summation = 0
         for e_index in np.random.choice(range(1,len(self.get_edges())), size=int((len(self.get_edges()))/2)):

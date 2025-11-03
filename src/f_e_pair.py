@@ -13,6 +13,8 @@ class FEPair:
         self.weight = weight
         self.node_labels = node_labels
         self.theta = theta
+
+        self.consider_edge = True
         
         # init node positions, node counts
         self.novel_nodes = None
@@ -109,8 +111,7 @@ class FEPair:
         possible_u_labels = [self.node_labels[node] for node in self.possible_u_nodes]
 
         if (len(possible_u_labels) == 0):
-            self.prob_u_label_equals_0 = 0
-            self.prob_u_label_equals_1 = 0
+            self.consider_edge = False
         else:
             self.prob_u_label_equals_1 = sum(possible_u_labels) / len(possible_u_labels)
             self.prob_u_label_equals_0 = 1 - self.prob_u_label_equals_1
@@ -135,6 +136,9 @@ class FEPair:
     
     # update and return likelihood when the labels are changed
     def calculate_prob(self, theta, node_labels):
+        if self.consider_edge == False:
+            return 1
+
         p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = theta
 
         # novel nodes counting
@@ -195,7 +199,9 @@ class FEPair:
         p, q, gamma_nu, gamma_nr, gamma_eu, gamma_er = self.theta
 
         # check what set the label is in...
-        if label_changed_index in self.novel_nodes:
+        if self.consider_edge == False:
+            return 1
+        elif label_changed_index in self.novel_nodes:
             # print("novel")
             if label_new_value == 1:
                 temp_prob_given_u_1 = self.prob_given_u_1 * gamma_nu / gamma_nr * self.nov0 / (self.nov1+1)
@@ -225,22 +231,24 @@ class FEPair:
         elif label_changed_index in self.external_nodes:
             # print("external not added")
             if label_new_value == 1:
-                temp_prob_given_u_1 = self.prob_given_u_1 * (self.posext1 - self.ext1 + 1) / (self.posext0 - self.ext0) * self.posext0 / (self.posext1 + 1)
-                temp_prob_given_u_0 = self.prob_given_u_0 * (self.posext1 - self.ext1 + 1) / (self.posext0 - self.ext0) * self.posext0 / (self.posext1 + 1)
-
                 if (self.posext0-self.ext0 == 0):
                     temp_prob_given_u_1 = self.prob_given_u_1 * (self.posext1 - self.ext1 + 1) * self.posext0 / (self.posext1 + 1)
                     temp_prob_given_u_0 = self.prob_given_u_0 * (self.posext1 - self.ext1 + 1) * self.posext0 / (self.posext1 + 1)
+                else:
+                    temp_prob_given_u_1 = self.prob_given_u_1 * (self.posext1 - self.ext1 + 1) / (self.posext0 - self.ext0) * self.posext0 / (self.posext1 + 1)
+                    temp_prob_given_u_0 = self.prob_given_u_0 * (self.posext1 - self.ext1 + 1) / (self.posext0 - self.ext0) * self.posext0 / (self.posext1 + 1)
 
                 return temp_prob_given_u_1*self.prob_u_label_equals_1 + temp_prob_given_u_0*self.prob_u_label_equals_0
 
             else:
-                temp_prob_given_u_0 = self.prob_given_u_0 * (self.posext0 - self.ext0 + 1) / (self.posext1 - self.ext1) * self.posext1 / (self.posext0 + 1)
-                temp_prob_given_u_1 = self.prob_given_u_1 * (self.posext0 - self.ext0 + 1) / (self.posext1 - self.ext1) * self.posext1 / (self.posext0 + 1)
-
                 if (self.posext1-self.ext1 == 0):
                     temp_prob_given_u_0 = self.prob_given_u_0 * (self.posext0 - self.ext0 + 1) * self.posext1 / (self.posext0 + 1)
                     temp_prob_given_u_1 = self.prob_given_u_1 * (self.posext0 - self.ext0 + 1) * self.posext1 / (self.posext0 + 1)
+                else:
+                    temp_prob_given_u_0 = self.prob_given_u_0 * (self.posext0 - self.ext0 + 1) / (self.posext1 - self.ext1) * self.posext1 / (self.posext0 + 1)
+                    temp_prob_given_u_1 = self.prob_given_u_1 * (self.posext0 - self.ext0 + 1) / (self.posext1 - self.ext1) * self.posext1 / (self.posext0 + 1)
+
+                
                 
                 return temp_prob_given_u_1*self.prob_u_label_equals_1 + temp_prob_given_u_0*self.prob_u_label_equals_0
         
@@ -328,24 +336,24 @@ class FEPair:
         elif label_changed_index in self.external_nodes:
             # print("external not added")
             if label_new_value == 1:
-                self.prob_given_u_1 = self.prob_given_u_1 * (self.posext1 - self.ext1 + 1) / (self.posext0 - self.ext0) * self.posext0 / (self.posext1 + 1)
-                self.prob_given_u_0 = self.prob_given_u_0 * (self.posext1 - self.ext1 + 1) / (self.posext0 - self.ext0) * self.posext0 / (self.posext1 + 1)
-
                 if (self.posext0-self.ext0 == 0):
                     self.prob_given_u_1 = self.prob_given_u_1 * (self.posext1 - self.ext1 + 1) * self.posext0 / (self.posext1 + 1)
                     self.prob_given_u_0 = self.prob_given_u_0 * (self.posext1 - self.ext1 + 1) * self.posext0 / (self.posext1 + 1)
+                else:
+                    self.prob_given_u_1 = self.prob_given_u_1 * (self.posext1 - self.ext1 + 1) / (self.posext0 - self.ext0) * self.posext0 / (self.posext1 + 1)
+                    self.prob_given_u_0 = self.prob_given_u_0 * (self.posext1 - self.ext1 + 1) / (self.posext0 - self.ext0) * self.posext0 / (self.posext1 + 1)
 
                 self.posext1 += 1
                 self.posext0 -= 1
 
             else:
-                self.prob_given_u_0 *= (self.posext0 - self.ext0 + 1) / (self.posext1 - self.ext1) * self.posext1 / (self.posext0 + 1)
-                self.prob_given_u_1 *= (self.posext0 - self.ext0 + 1) / (self.posext1 - self.ext1) * self.posext1 / (self.posext0 + 1)
-
                 if (self.posext1-self.ext1 == 0):
                     self.prob_given_u_0 = self.prob_given_u_0 * (self.posext0 - self.ext0 + 1) * self.posext1 / (self.posext0 + 1)
                     self.prob_given_u_1 = self.prob_given_u_1 * (self.posext0 - self.ext0 + 1) * self.posext1 / (self.posext0 + 1)
-                
+                else:
+                    self.prob_given_u_0 *= (self.posext0 - self.ext0 + 1) / (self.posext1 - self.ext1) * self.posext1 / (self.posext0 + 1)
+                    self.prob_given_u_1 *= (self.posext0 - self.ext0 + 1) / (self.posext1 - self.ext1) * self.posext1 / (self.posext0 + 1)
+
                 self.posext0 += 1
                 self.posext1 -= 1
         
