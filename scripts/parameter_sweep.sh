@@ -21,7 +21,7 @@ echo "Node: ${SLURMD_NODENAME}"
 echo "Starting: "`date +"%D %T"` 
 
 # Your calculations here
-.venv/bin/python parameter_sweep.py -${SLURM_ARRAY_TASK_ID}
+.venv/bin/python src/parameter_sweep.py -${SLURM_ARRAY_TASK_ID}
 
 
 # End of job info 

@@ -24,7 +24,7 @@ echo "Starting: "`date +"%D %T"`
 
 echo $PWD
 
-.venv/bin/python slurm_test.py -${SLURM_JOB_ID}
+.venv/bin/python src/slurm_test.py -${SLURM_JOB_ID}
 
 
 # End of job info 

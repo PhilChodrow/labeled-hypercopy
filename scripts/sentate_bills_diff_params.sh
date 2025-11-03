@@ -3,12 +3,12 @@
 # SLURM template for serial jobs
 
 # Set SLURM options
-#SBATCH --job-name=slurm_test      # Job name
-#SBATCH --output=slurm_test-%j.out # Output file incorporating job ID
-#SBATCH --partition=standard        # Partition (queue) 
+#SBATCH --job-name=senate_bills      # Job name
+#SBATCH --output=senate_bills-%j.out # Output file incorporating job ID
+#SBATCH --partition=long        # Partition (queue) 
 #SBATCH --array=1-5
-#SBATCH --time=10:00:00             # Time limit hrs:min:sec
-#SBATCH --mem=8G                 # Job memory request 
+#SBATCH --time=100:00:00             # Time limit hrs:min:sec
+#SBATCH --mem=128G                 # Job memory request 
 #SBATCH --mail-type=BEGIN,END
 #SBATCH --mail-user=fcataldo@middlebury.edu
 
@@ -24,7 +24,7 @@ echo "Starting: "`date +"%D %T"`
 
 echo $PWD
 
-.venv/bin/python senate_bills_algo_test.py -${SLURM_JOB_ID}
+.venv/bin/python src/senate_bills_algo_test.py -${SLURM_JOB_ID}
 
 
 # End of job info 
