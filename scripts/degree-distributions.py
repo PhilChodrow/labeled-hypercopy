@@ -28,7 +28,7 @@ v = v / v.sum()
 P = v.reshape((k_max + 1, k_max + 1))
 
 
-# compute some moments of the 
+# compute some moments of the degree distribution
 
 K_0 = np.arange(k_max + 1)[:, None] 
 K_1 = np.arange(k_max + 1)[None, :]
@@ -43,7 +43,7 @@ mean_d = np.nansum(K*P)
 a = (1 + theta[0]*(rho_0 + rho_1 - 1) + theta[1]*rho_01)/mean_d
 
 # need to review math and re-check this, probably not right as is
-zeta = 1 + (theta[4] + theta[5]) / a
+zeta = 2 + (theta[4] + theta[5]) / a
 
 
 def degree_sequence(g):
