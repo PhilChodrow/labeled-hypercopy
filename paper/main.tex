@@ -41,6 +41,26 @@
 
 \section{Long-Run Dynamics}
 
+
+\subsection{Joint Distribution of Edge Labels}
+
+We consider the joint distribution $p(k_0, k_1)$ of label counts in a uniformly random edge, where $k_0$ is the number of nodes with label 0 in the edge and $k_1$ is the number of nodes with label 1 in the edge. 
+Although we are unable to find a closed-form expression for this distribution at stationarity, we can write down a linear map whose leading eigenvector corresponds to the stationary distribution.
+Let $p^{(t)}(k_0, k_1)$ be the joint distribution of label counts in a uniformly random edge after $t$ timesteps. 
+Then, the probability $q(k_0', k_1')$ of realizing an edge with $k_0'$ nodes of label 0 and $k_1'$ nodes of label 1 at time $t+1$ is given by 
+\begin{align}
+    q(k_0', k_1') = \sum_{k_0, k_1} T(k_0', k_1' | k_0, k_1)p^{(t)}(k_0, k_1)  \;,
+\end{align}
+where $T(k_0', k_1' | k_0, k_1)$ gives the probability that the edge $e$ realized in step $t+1$ has $k_0'$ nodes of label 0 and $k_1'$ nodes of label 1 given that the edge $f$ sampled to form $e$ has $k_0$ nodes of label 0 and $k_1$ nodes of label 1.
+At stationarity, we must have $q(k_0', k_1') = p^{(t)}(k_0', k_1') = p^{(t+1)}(k_0', k_1')$, so the stationarity condition can be obtained by solving the linear system 
+\begin{align}
+    p(k_0', k_1') = \sum_{k_0, k_1} T(k_0', k_1' | k_0, k_1)p(k_0, k_1)  \;.
+\end{align}
+The stationary joint distribution $p(k_0, k_1)$ is therefore given by the leading eigenvector of the doubly-indexed matrix $T$ with entries $T(k_0', k_1' | k_0, k_1)$.
+
+
+
+
 \phil{What's in here is mostly notes and needs to be cleaned up some.}
 
 \subsection{Mean Degree}
@@ -111,13 +131,23 @@ Allowing $d$ to become large (which describes the tail of the degree distributio
 a relation which corresponds to a power law with exponent $\zeta = 1 + \frac{\gamma_+ + \gamma_0}{\tilde{\sigma}}$. 
 Explicitly calculating this moment requires computing the moments $\rho_0$, $\rho_1$, and $\rho_{01}$, which can be done computationally from the stationary joint distribution $p(k_0, k_1)$. 
 
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.5\textwidth]{../fig/degree_distribution.png}
+    \caption{Degree distribution from simulation (points) and theoretical power law (line) with exponent computed from model parameters and joint label distribution moments. \phil{Put three series on this plot and give slopes for each. Also, fairly sure the calculation is bugged in either math or code.}}
+    \label{fig:example}
+\end{figure}
+
+
+
+
 \subsection{Joint Distribution of Labels}
 
 
 \begin{figure*}[t]
     \centering
     \includegraphics[width=1\textwidth]{../fig/linear_map_eigenvectors.png}
-    \caption{Dynamics! Top shows the three leading eigenvectors of the distribution $p(k_0, k_1)$. Bottom left gives the cosine similarity (normalized projection) between one run of simulation dynamics and these eigenvectors. Bottom right gives the efinal simulation state.}
+    \caption{Dynamics! Top shows the three leading eigenvectors of the distribution $p(k_0, k_1)$. Bottom left gives the cosine similarity (normalized projection) between one run of simulation dynamics and these eigenvectors. Bottom right gives the final simulation state.}
     \label{fig:example}
 \end{figure*}
 
