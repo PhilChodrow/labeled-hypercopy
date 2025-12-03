@@ -6,6 +6,7 @@
 \usepackage{amsmath,amssymb,bm}
 \usepackage{graphicx}
 \usepackage{hyperref}
+\usepackage{cleveref}
 \hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
 
 \input{macros}
@@ -39,10 +40,75 @@
 
 \section{Introduction}
 
+\subsection{Higher order!!!}
+
+\cite{torresWhyHowWhen2021,battiston2021physics,battistonNetworksPairwiseInteractions2020}. 
+
+General hypergraph data mining: 
+
+\cite{leeSurveyHypergraphMining2025}
+
+
+\subsection{Structural Properties of Higher-Order Network Data}
+
+\cite{landrySimplicialityHigherorderNetworks2024}
+
+
+\cite{leeHowHyperedgesOverlap2021}
+
+Impact of overlap on dynamics: \cite{maliziaHyperedgeOverlapDrives2025}
+
+
+\subsection{Generative Hypergraph Models}
+
+Higher-order intersections: \cite{bensonSimplicialClosureHigherorder2018}
+
+CRU: \cite{bensonSequencesSets2018}
+
+
+Edge-copy model: \cite{heEdgeCorrelationsLink2025}
+
+THyME: \cite{leeTHyMeTemporalHypergraph2021}
+
+A model based on diversity: \cite{yuModelingHypergraphsDiversity2025}
+
+
+
+
+
+
+
+\subsection{Generative Models for Inference and Community Detection}
+
+
+
+\cite{ruggeriCommunityDetectionLarge2023}
+\cite{kritschgauCommunityDetectionHypergraphs2024,chodrowGenerativeHypergraphClustering2021,chodrowNonbacktrackingSpectralClustering2023}
+
+
+\cite{hoodBroadSpectrumStructure2025}
+
+\subsection{Need to categorize}
+
+\cite{badalyanStructureInferenceHypergraphs2024}
+
+\subsection{Tooling}
+
+PyTorch: \cite{pytorch}
+
+Simulated annealing? \cite{kirkpatrickOptimizationSimulatedAnnealing1983}
+
+
+
+XGI!! \cite{landryXGIPythonPackage2023}
+
+
 \section{Long-Run Dynamics}
 
 
 \subsection{Joint Distribution of Edge Labels}
+
+
 
 We consider the joint distribution $p(k_0, k_1)$ of label counts in a uniformly random edge, where $k_0$ is the number of nodes with label 0 in the edge and $k_1$ is the number of nodes with label 1 in the edge. 
 Although we are unable to find a closed-form expression for this distribution at stationarity, we can write down a linear map whose leading eigenvector corresponds to the stationary distribution.
@@ -57,11 +123,38 @@ At stationarity, we must have $q(k_0', k_1') = p^{(t)}(k_0', k_1') = p^{(t+1)}(k
     p(k_0', k_1') = \sum_{k_0, k_1} T(k_0', k_1' | k_0, k_1)p(k_0, k_1)  \;.
 \end{align}
 The stationary joint distribution $p(k_0, k_1)$ is therefore given by the leading eigenvector of the doubly-indexed matrix $T$ with entries $T(k_0', k_1' | k_0, k_1)$.
+The entries of this matrix can be computed analytically. 
+Conditional on choosing an edge $f$ with $k_0$ nodes of label 0 and $k_1$ nodes of label 1, a node of label $z$ is selected as the seed node $u$ with probability $k_z / (k_0 + k_1)$.
+Then, the number of nodes of labels $z$ and $\bar{z}$ in $e$ have distributions
+\begin{align*}
+    k_z' &\sim 1 + \text{Binom}\paren{k_z - 1, \eta_+} + \text{Poisson}(\lambda_+ + \gamma_+) \;, \\
+    k_{\bar{z}}' &\sim \text{Binom}\paren{k_{\bar{z}}, \eta_-} + \text{Poisson}(\lambda_- + \gamma_-) \;.
+\end{align*}
+The probability of obtaining $k_0'$ nodes of label 0, conditioning on $k_0$ and $k_1$, is 
+\begin{widetext}
+    \begin{align}
+        t(k_0' | k_0, k_1) =& \frac{k_0}{k_0 + k_1} \sum_{i=0}^{k_0' - 1} \binom{k_0 - 1}{i} \eta_+^i (1 - \eta_+)^{k_0 - 1 - i} 
+        e^{-(\lambda_+ + \gamma_+)} \frac{(\lambda_+ + \gamma_+)^{k_0' - 1 - i}}{(k_0' - 1 - i)!}  + \\ 
+        & \frac{k_1}{k_0 + k_1} \sum_{i=0}^{k_0'} \binom{k_0}{i} \eta_-^i (1 - \eta_-)^{k_0 - i} 
+        e^{-(\lambda_- + \gamma_-)} \frac{(\lambda_- + \gamma_-)^{k_0' - i}}{(k_0' - i)!}\;.
+    \end{align}
+\end{widetext}
+A parallel expression describes $t(k_1' | k_0, k_1)$, and the transition matrix entries are given by the product 
+\begin{align}
+    T(k_0', k_1' | k_0, k_1) = t(k_0' | k_0, k_1) t(k_1' | k_0, k_1) \;.
+\end{align}
+In \Cref{fig:dynamics-eigenvectors}, we show projections of the joint distribution $p^{(t)}(k_0, k_1)$ onto the top three eigenvectors of the matrix $T$ during a simulation run. 
+These eigenvectors are computed numerically. 
+The Perron eigenvector $v_1$ with eigenvalue $1$ corresponds to the stationary distribution $p(k_0, k_1)$, while the second and third eigenvectors $v_2$ and $v_3$ correspond to transient dynamics.
+The corresponding eigenvalues are relatively large, indicating that these transients decay relatively slowly. 
 
 
 
 
-\phil{What's in here is mostly notes and needs to be cleaned up some.}
+
+
+
+
 
 \subsection{Mean Degree}
 
@@ -135,7 +228,7 @@ Explicitly calculating this moment requires computing the moments $\rho_0$, $\rh
     \centering
     \includegraphics[width=0.5\textwidth]{../fig/degree_distribution.png}
     \caption{Degree distribution from simulation (points) and theoretical power law (line) with exponent computed from model parameters and joint label distribution moments. \phil{Put three series on this plot and give slopes for each. Also, fairly sure the calculation is bugged in either math or code.}}
-    \label{fig:example}
+    \label{fig:degrees}
 \end{figure}
 
 
@@ -147,8 +240,10 @@ Explicitly calculating this moment requires computing the moments $\rho_0$, $\rh
 \begin{figure*}[t]
     \centering
     \includegraphics[width=1\textwidth]{../fig/linear_map_eigenvectors.png}
-    \caption{Dynamics! Top shows the three leading eigenvectors of the distribution $p(k_0, k_1)$. Bottom left gives the cosine similarity (normalized projection) between one run of simulation dynamics and these eigenvectors. Bottom right gives the final simulation state.}
-    \label{fig:example}
+    \caption{Dynamics! Top shows the three leading eigenvectors of the distribution $p(k_0, k_1)$. Bottom left gives the cosine similarity (normalized projection) between one run of simulation dynamics and these eigenvectors. Bottom right gives the final simulation state.
+    \phil{Need to check these projections, looks a bit strange. Can run $10^7$ steps in two minutes on laptop.}
+    }
+    \label{fig:dynamics-eigenvectors}
 \end{figure*}
 
 
@@ -159,6 +254,8 @@ Explicitly calculating this moment requires computing the moments $\rho_0$, $\rh
 \subsection{Parameter Estimation via Stochastic EM}
 
 \phil{Violet, this is your spot! Descriptions of methods/algorithms should go here, results are for later. }
+
+Stochastic \cite{cappeOnLineExpectationMaximization2009} expectation-maximization \cite{dempster1977maximum}. 
 
 
 \subsection{Community Detection via MLE}
