@@ -254,8 +254,35 @@ Explicitly calculating this moment requires computing the moments $\rho_0$, $\rh
 \subsection{Parameter Estimation via Stochastic EM}
 
 \phil{Violet, this is your spot! Descriptions of methods/algorithms should go here, results are for later. }
+    
+We introduce a Stochastic Expectation Maximization (SEM) algorithm for inferring the [INSERT MODEL NAME HERE] model parameters from a hypergraph. A traditional inference approach, maximum likelihood estimation (MLE), infers parameter values by selecting the set of parameters that are most likely to have generated the observed data. The probability that our data, the hypergraph $\mathcal{H}$, was generated using a given set of parameters $\theta$ depends not only on observable data (the hypergraph itself) but also on latent variables (the edge $e'$ and node $u$ selected at each timestep of the growth model). Therefore, to compute the log marginal likelihood, which MLE seeks to maximize over, we must marginalize over the latent variables, making this approach computationally expensive. Expectation Maximization (EM) algorithms also maximize over the log marginal likelihood, but avoid expensive marginalization. However, the original EM algorithm \cite{dempster1977maximum} computes the expected value of a sufficient statistic using all observations at each time step, which introduces another computational cost. Stochastic Expectation Maximization \cite{cappeOnLineExpectationMaximization2009} resolves this issue by, at each timestep, computing the expectation using only one randomly selected data point.
+    
+Each iteration of the SEM algorithm consists of two steps: the E-step, in which the expected values of the sufficient statistics are calculated using the current parameter estimates, and the M-step, in which the parameter estimates are updated using the expected sufficient statistics. 
 
-Stochastic \cite{cappeOnLineExpectationMaximization2009} expectation-maximization \cite{dempster1977maximum}. 
+Suppose we have an observed variable $x$ and a hidden variable $h$. Let $f(x_i, h_i)$ be a function which computes a sufficient statistic for each of the parameters in $\theta$ and let $F_i(\hat{\theta}) = \mathbb{E}[f(x_i, h_i) | x_i]$ be the function which computes the expected sufficient statistic values given an observed $x_i$. Let $g$ be a function which computes the maximum likelihood estimate of $\theta$ from the sufficient statistics. Fix a sequence of learning rates $\ell^{(1)}, \ldots, \ell^{(t)}$. Each iteration, $t$, of SEM proceeds as follows.
+    
+\textbf{E step:} Sample an observation $x_i$ from the data uniformly at random. Compute the expected sufficient statistics $F_i(\hat{\theta}^{(t - 1)})$ using the randomly selected data point $x_i$ and the parameter estimates $\hat{\theta}^{(t - 1)}$ from the previous timestep. Generate an new estimate of sufficient statistics $s^{(t)}$ according to the update rule: $s^{(t)} = (1 - \ell^{(t)}) s^{(t - 1)} + \ell^{(t)}F_i(\hat{\theta}^{(t - 1)})$.
+    
+\textbf{M step:} Compute the new parameter estimates $\hat{\theta}^{(t)}$ from the updated sufficient statistics:
+$\hat{\theta}^{(t)} = g(s^{(t)})$.
+    
+\subsubsection{Description of SEM on hypergraphs}
+We use an SEM algorithm to estimate the parameters $\theta = (p, q, \gamma_{e, z_u}, \gamma_{e, \bar{z_u}}, \gamma_{e, z_n}, \gamma_{e, \bar{z_n}})$ used to generate a hypergraph $\mathcal{H}$ via the [MODEL NAME] model. At each timestep, we have an observed variable $e'$ (a hyperedge) and two hidden variables $u$ and $e$ (the node and the hyperedge that generated $e'$). Let $f$ be a function which computes a sufficient statistic for each of the parameters in $\theta$. Specifically, let
+\begin{equation*}
+    f(e, u, e') = (t_{z_u}, w_{z_u}, t_{\bar{z}_u}, w_{\bar{z}_u}, n_{e, z_u}, n_{e, \bar{z}_u}, n_{n, z_u}, n_{n, \bar{z}_u})
+\end{equation*}
+where $w_{z_u}$ is the number of nodes with label  $z_u$ in $e$, $w_{\bar{z}_u}$ is the number of nodes with the label $\bar{z}_r$ in $e$, $t_{z_u}$ and $t_{\bar{z}_u}$ are the numbers of nodes with label $z_u$ and $\bar{z}_r$, respectively, copied from $e$ to $e'$, $n_{e, z_u}$ and ${n_{e, \bar{z}_u}}$ are the numbers of external nodes with labels $z_u$ and $\bar{z}_r$ in $e'$, and $n_{n, z_u}$ and ${n_{n, \bar{z}_u}}$ are the numbers of new nodes with labels $z_u$ and $\bar{z}_r$ in $e'$. The sufficiency of these statistics follows from standard results \cite{rice2007mathematical}. Then the function \begin{equation*}
+\begin{split}
+    F_{e'}(\hat{\theta}^{(t - 1)}) &= \mathbb{E}[f(e, u, e') | e', \hat{\theta}^{(t - 1)}] \\
+    &= \frac{\sum_{e \in \mathcal{E}_{\text{prev}}} \sum_{u \in e \cap e'} p(e, u, e' | \hat{\theta}^{(t - 1)}) f(e, u, e')}{\sum_{e \in \mathcal{E}_{\text{prev}}} \sum_{u \in e \cap e'} p(e, u, e' | \hat{\theta}^{(t - 1)}) } 
+\end{split}
+\end{equation*}
+computes the expected values of the sufficient statistics at time $t$ given edge $e'$. Finally, the maximum likelihood estimate of $\theta$ is given by
+\begin{equation*}
+    g(s^{(t)}) = \left ( \frac{t_u}{w_{z_u}}, \frac{t_{\bar{z}_u}}{w_{\bar{z}_u}}, n_{e, z_u}, n_{e, \bar{z}_u}, n_{n, z_u}, n_{n, \bar{z}_u} \right).
+\end{equation*}
+Each iteration of our SEM algorithm for hypergraphs then proceeds following the E- and M-steps detailed above.
+
 
 
 \subsection{Community Detection via MLE}
